@@ -1,13 +1,24 @@
 """Verify Supabase JWTs and resolve the calling provider.
 
-Every doctor-facing endpoint depends on get_current_provider, which:
-1. Validates the bearer token against the Supabase JWT secret
-2. Looks up (or lazily creates) the provider + practice rows on first login
+Supports both Supabase signing schemes:
+- New projects: asymmetric keys (ES256/RS256), verified against the project's
+  public JWKS endpoint
+- Legacy projects: shared-secret HS256
 """
+from functools import lru_cache
+
 import jwt
+from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, Header
+
 from .config import get_settings
 from .db import get_db
+
+
+@lru_cache
+def _jwk_client() -> PyJWKClient:
+    s = get_settings()
+    return PyJWKClient(f"{s.supabase_url}/auth/v1/.well-known/jwks.json")
 
 
 def _decode_token(authorization: str | None) -> dict:
@@ -16,8 +27,21 @@ def _decode_token(authorization: str | None) -> dict:
     token = authorization.split(" ", 1)[1]
     s = get_settings()
     try:
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+        if alg == "HS256":
+            return jwt.decode(
+                token,
+                s.supabase_jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+        signing_key = _jwk_client().get_signing_key_from_jwt(token)
         return jwt.decode(
-            token, s.supabase_jwt_secret, algorithms=["HS256"], audience="authenticated"
+            token,
+            signing_key.key,
+            algorithms=["ES256", "RS256"],
+            audience="authenticated",
         )
     except jwt.PyJWTError as e:
         raise HTTPException(401, f"Invalid token: {e}")
