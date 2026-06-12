@@ -209,6 +209,47 @@ def save_template(guide_id: str, body: TemplateSave, provider=Depends(get_curren
     return {"ok": True}
 
 
+class SendGuideBody(BaseModel):
+    email: str
+
+
+@router.post("/guides/{guide_id}/send")
+def send_guide_to_patient(guide_id: str, body: SendGuideBody, provider=Depends(get_current_provider)):
+    email = body.email.strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1] or " " in email:
+        raise HTTPException(400, "That doesn't look like a valid email address")
+    db = get_db()
+    guide = (
+        db.table("guides")
+        .select("id, status, secure_token, condition, patients(first_name)")
+        .eq("id", guide_id)
+        .eq("practice_id", provider["practice_id"])
+        .single()
+        .execute()
+        .data
+    )
+    if not guide:
+        raise HTTPException(404, "Guide not found")
+    if guide["status"] != "approved" or not guide["secure_token"]:
+        raise HTTPException(400, "Approve the Guide before sending it")
+
+    practice = (
+        db.table("practices").select("name").eq("id", provider["practice_id"]).single().execute().data
+    )
+    s = get_settings()
+    link = f"{s.guide_base_url}/{guide['secure_token']}"
+
+    from ..email_service import send_guide
+    ok = send_guide(email, guide["patients"]["first_name"], practice["name"], guide["condition"], link)
+    if not ok:
+        raise HTTPException(
+            502,
+            "Email couldn't be sent. Check the address, or copy the link and send it yourself.",
+        )
+    db.table("guides").update({"patient_email": email, "sent_at": "now()"}).eq("id", guide_id).execute()
+    return {"ok": True, "sent_to": email}
+
+
 # ---------- public patient access (token, no login) ----------
 @router.get("/public/guide/{token}")
 def public_guide(token: str):

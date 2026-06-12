@@ -81,4 +81,9 @@ def get_current_provider(authorization: str | None = Header(None)) -> dict:
         .execute()
         .data[0]
     )
+    try:
+        from .email_service import send_welcome
+        send_welcome(email, full_name, practice_name)
+    except Exception:
+        pass
     return provider
