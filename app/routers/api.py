@@ -209,6 +209,27 @@ def save_template(guide_id: str, body: TemplateSave, provider=Depends(get_curren
     return {"ok": True}
 
 
+@router.post("/guides/{guide_id}/retry")
+def retry_guide(guide_id: str, background: BackgroundTasks, provider=Depends(get_current_provider)):
+    db = get_db()
+    guide = (
+        db.table("guides")
+        .select("id, status")
+        .eq("id", guide_id)
+        .eq("practice_id", provider["practice_id"])
+        .single()
+        .execute()
+        .data
+    )
+    if not guide:
+        raise HTTPException(404, "Guide not found")
+    if guide["status"] != "failed":
+        raise HTTPException(400, "Only failed Guides can be retried")
+    db.table("guides").update({"status": "generating", "generated_json": None}).eq("id", guide_id).execute()
+    background.add_task(generate_guide, guide_id)
+    return {"ok": True}
+
+
 class SendGuideBody(BaseModel):
     email: str
 

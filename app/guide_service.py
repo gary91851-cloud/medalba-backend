@@ -56,7 +56,7 @@ def generate_guide(guide_id: str) -> None:
     try:
         msg = client.messages.create(
             model=s.claude_model,
-            max_tokens=8000,
+            max_tokens=16000,
             system=system_prompt_for(guide["condition"]),
             messages=[
                 {
