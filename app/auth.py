@@ -64,7 +64,16 @@ def get_current_provider(authorization: str | None = Header(None)) -> dict:
 
     practice = (
         db.table("practices")
-        .insert({"name": practice_name, "subscription_tier": "pilot"})
+        .insert(
+            {
+                "name": practice_name,
+                "subscription_tier": "pilot",
+                "npi": meta.get("practice_npi") or None,
+                "address": meta.get("practice_address") or None,
+                "city": meta.get("practice_city") or None,
+                "state": meta.get("practice_state") or None,
+            }
+        )
         .execute()
         .data[0]
     )

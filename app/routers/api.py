@@ -36,6 +36,85 @@ async def extract(file: UploadFile = File(...), provider=Depends(get_current_pro
         )
 
 
+# ---------- NPI registry lookup (public: runs during signup, before auth) ----------
+@router.get("/npi/search")
+def npi_search(q: str):
+    q = q.strip()
+    if len(q) < 3:
+        return []
+    import httpx
+    try:
+        r = httpx.get(
+            "https://npiregistry.cms.hhs.gov/api/",
+            params={
+                "version": "2.1",
+                "organization_name": q + "*",
+                "enumeration_type": "NPI-2",
+                "limit": 6,
+            },
+            timeout=8,
+        )
+        results = r.json().get("results", []) or []
+    except Exception:
+        return []
+    out = []
+    for item in results:
+        basic = item.get("basic", {}) or {}
+        loc = next((a for a in item.get("addresses", []) if a.get("address_purpose") == "LOCATION"), {}) or {}
+        out.append(
+            {
+                "npi": str(item.get("number", "")),
+                "name": (basic.get("organization_name") or "").title(),
+                "address": (loc.get("address_1") or "").title(),
+                "city": (loc.get("city") or "").title(),
+                "state": loc.get("state") or "",
+            }
+        )
+    return out
+
+
+# ---------- templates ----------
+@router.get("/templates")
+def list_templates(provider=Depends(get_current_provider)):
+    db = get_db()
+    return (
+        db.table("templates")
+        .select("id, condition, name, age_min, age_max, created_at")
+        .eq("practice_id", provider["practice_id"])
+        .order("created_at", desc=True)
+        .execute()
+        .data
+    )
+
+
+# ---------- settings ----------
+class PracticeUpdate(BaseModel):
+    name: str | None = None
+
+
+@router.patch("/practice")
+def update_practice(body: PracticeUpdate, provider=Depends(get_current_provider)):
+    db = get_db()
+    updates = {}
+    if body.name and body.name.strip():
+        updates["name"] = body.name.strip()
+    if updates:
+        db.table("practices").update(updates).eq("id", provider["practice_id"]).execute()
+    return {"ok": True}
+
+
+class ProviderUpdate(BaseModel):
+    full_name: str | None = None
+
+
+@router.patch("/me")
+def update_me(body: ProviderUpdate, provider=Depends(get_current_provider)):
+    db = get_db()
+    if body.full_name and body.full_name.strip():
+        db.table("providers").update({"full_name": body.full_name.strip()}).eq("id", provider["id"]).execute()
+    return {"ok": True}
+
+
 # ---------- patients ----------
 class PatientIn(BaseModel):
     first_name: str
