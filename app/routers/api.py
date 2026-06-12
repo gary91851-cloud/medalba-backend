@@ -240,12 +240,9 @@ def send_guide_to_patient(guide_id: str, body: SendGuideBody, provider=Depends(g
     link = f"{s.guide_base_url}/{guide['secure_token']}"
 
     from ..email_service import send_guide
-    ok = send_guide(email, guide["patients"]["first_name"], practice["name"], guide["condition"], link)
+    ok, reason = send_guide(email, guide["patients"]["first_name"], practice["name"], guide["condition"], link)
     if not ok:
-        raise HTTPException(
-            502,
-            "Email couldn't be sent. Check the address, or copy the link and send it yourself.",
-        )
+        raise HTTPException(502, reason or "Email couldn't be sent — copy the link and send it yourself.")
     db.table("guides").update({"patient_email": email, "sent_at": "now()"}).eq("id", guide_id).execute()
     return {"ok": True, "sent_to": email}
 

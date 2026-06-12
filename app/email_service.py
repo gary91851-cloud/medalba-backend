@@ -26,10 +26,10 @@ BRAND_WRAP = """\
 </td></tr></table></body></html>"""
 
 
-def _send(to: str, subject: str, body_rows: str, footer: str) -> bool:
+def _send(to: str, subject: str, body_rows: str, footer: str) -> tuple[bool, str]:
     s = get_settings()
     if not s.resend_api_key:
-        return False
+        return False, "Email isn't configured yet — RESEND_API_KEY is missing on the server."
     try:
         r = httpx.post(
             "https://api.resend.com/emails",
@@ -42,12 +42,21 @@ def _send(to: str, subject: str, body_rows: str, footer: str) -> bool:
             },
             timeout=10,
         )
-        return r.status_code in (200, 201)
+        if r.status_code in (200, 201):
+            return True, ""
+        text = r.text.lower()
+        if r.status_code in (401,):
+            return False, "Email service rejected the API key — re-check RESEND_API_KEY in Railway."
+        if "verify a domain" in text or "testing emails" in text or r.status_code == 403:
+            return False, ("Resend is in test mode: until you verify your domain, it only delivers to the "
+                           "email address on your Resend account. Use that address to test, or verify your "
+                           "domain at resend.com/domains.")
+        return False, f"Email service error ({r.status_code}). Copy the link and send it yourself for now."
     except Exception:
-        return False
+        return False, "Couldn't reach the email service. Copy the link and send it yourself for now."
 
 
-def send_welcome(to: str, provider_name: str, practice_name: str) -> bool:
+def send_welcome(to: str, provider_name: str, practice_name: str) -> tuple[bool, str]:
     body = f"""
 <tr><td style="padding-top:22px;font-size:17px;line-height:1.7;">
   <p style="margin:0 0 14px;">Welcome, {provider_name} —</p>
@@ -67,7 +76,7 @@ def send_welcome(to: str, provider_name: str, practice_name: str) -> bool:
     return _send(to, f"Welcome to MedAlba, {provider_name}", body, footer)
 
 
-def send_guide(to: str, patient_first_name: str, practice_name: str, condition: str, link: str) -> bool:
+def send_guide(to: str, patient_first_name: str, practice_name: str, condition: str, link: str) -> tuple[bool, str]:
     body = f"""
 <tr><td style="padding-top:22px;font-size:17px;line-height:1.7;">
   <p style="margin:0 0 14px;">Hi {patient_first_name},</p>
