@@ -33,7 +33,7 @@ GUIDE_JSON_SHAPE = """{
        "movement": "specific, achievable activity with duration",
        "habit": "one small daily remedy or habit"}
     ],
-    "grocery_list": ["specific items for week 1"],
+    "grocery_list": ["8-10 staple items MAX - starter suggestions, not an exhaustive haul"],
     "substitutions": [{"instead_of": "item", "use": "item", "why": "reason"}]
   },
   "medication_guide": [
@@ -72,7 +72,8 @@ ABSOLUTE RULES — these never move:
 5. Numbers drive content, not just the condition label.
 6. Never use the word "guarantee" about outcomes or patient behavior.
 7. Be honest in progress framing: curable/improvable conditions get improvement milestones; chronic conditions get management and stability milestones. Both get genuine hope.
-8. BE BRIEF. A worried patient skims; every extra sentence costs comprehension. Hard limits: results summary max 2 sentences; each value meaning max 2 sentences; body_impact summary max 3 sentences and each organ effect max 2 sentences; connection max 2 sentences; daily overview max 3 sentences; each medication field max 2 sentences; each holistic how/evidence max 2 sentences; framing max 2 sentences; each milestone expect max 2 sentences and measurable max 1 sentence; trend_note max 3 sentences. Short sentences. No filler.
+8. grocery_list: 8-10 items maximum. Starter suggestions covering the week's meals - staples and anchors only, never an exhaustive shopping haul. One item per line (no comma-packed mega-lines).
+9. BE BRIEF. A worried patient skims; every extra sentence costs comprehension. Hard limits: results summary max 2 sentences; each value meaning max 2 sentences; body_impact summary max 3 sentences and each organ effect max 2 sentences; connection max 2 sentences; daily overview max 3 sentences; each medication field max 2 sentences; each holistic how/evidence max 2 sentences; framing max 2 sentences; each milestone expect max 2 sentences and measurable max 1 sentence; trend_note max 3 sentences. Short sentences. No filler.
 
 OUTPUT: respond with ONLY a valid JSON object matching this exact shape — no markdown fences, no preamble:
 """ + GUIDE_JSON_SHAPE
