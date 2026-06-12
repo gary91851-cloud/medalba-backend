@@ -90,8 +90,12 @@ def send_guide(to: str, patient_first_name: str, practice_name: str, condition: 
   font-family:Arial,sans-serif;font-weight:700;font-size:15px;padding:13px 30px;border-radius:9px;display:inline-block;">
   Open your Guide</a>
 </td></tr>
-<tr><td style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#49616a;">
+<tr><td style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#49616a;padding-bottom:14px;">
   No account or password needed — the link is private to you.
+</td></tr>
+<tr><td style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#49616a;line-height:1.6;">
+  If the button doesn't open, copy this link into your browser:<br>
+  <a href="{link}" style="color:#2e6e6a;word-break:break-all;">{link}</a>
 </td></tr>"""
     footer = (f"This Guide was sent by {practice_name}. It is educational support approved by your doctor "
               "and is not a substitute for medical advice. For clinical questions, contact your doctor's office.")
