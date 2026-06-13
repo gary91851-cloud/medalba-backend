@@ -72,6 +72,7 @@ def get_current_provider(authorization: str | None = Header(None)) -> dict:
                 "address": meta.get("practice_address") or None,
                 "city": meta.get("practice_city") or None,
                 "state": meta.get("practice_state") or None,
+                "baa_accepted_at": "now()" if meta.get("baa_accepted") else None,
             }
         )
         .execute()
@@ -85,6 +86,7 @@ def get_current_provider(authorization: str | None = Header(None)) -> dict:
                 "practice_id": practice["id"],
                 "full_name": full_name,
                 "email": email,
+                "role": meta.get("role") or "physician",
             }
         )
         .execute()

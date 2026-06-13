@@ -37,40 +37,76 @@ async def extract(file: UploadFile = File(...), provider=Depends(get_current_pro
 
 
 # ---------- NPI registry lookup (public: runs during signup, before auth) ----------
+def _npi_query(params: dict) -> list:
+    import httpx
+    try:
+        r = httpx.get(
+            "https://npiregistry.cms.hhs.gov/api/",
+            params={"version": "2.1", **params},
+            timeout=8,
+        )
+        return r.json().get("results", []) or []
+    except Exception:
+        return []
+
+
+def _npi_location(item: dict) -> dict:
+    return next(
+        (a for a in item.get("addresses", []) if a.get("address_purpose") == "LOCATION"), {}
+    ) or {}
+
+
 @router.get("/npi/search")
 def npi_search(q: str):
     q = q.strip()
     if len(q) < 3:
         return []
-    import httpx
-    try:
-        r = httpx.get(
-            "https://npiregistry.cms.hhs.gov/api/",
-            params={
-                "version": "2.1",
-                "organization_name": q + "*",
-                "enumeration_type": "NPI-2",
-                "limit": 6,
-            },
-            timeout=8,
-        )
-        results = r.json().get("results", []) or []
-    except Exception:
-        return []
-    out = []
-    for item in results:
+
+    out, seen = [], set()
+
+    # Organizations (group practices, clinics)
+    for item in _npi_query({"organization_name": q + "*", "enumeration_type": "NPI-2", "limit": 6}):
         basic = item.get("basic", {}) or {}
-        loc = next((a for a in item.get("addresses", []) if a.get("address_purpose") == "LOCATION"), {}) or {}
+        loc = _npi_location(item)
+        npi = str(item.get("number", ""))
+        if npi in seen:
+            continue
+        seen.add(npi)
         out.append(
             {
-                "npi": str(item.get("number", "")),
+                "npi": npi,
                 "name": (basic.get("organization_name") or "").title(),
+                "kind": "Practice",
                 "address": (loc.get("address_1") or "").title(),
                 "city": (loc.get("city") or "").title(),
                 "state": loc.get("state") or "",
             }
         )
-    return out
+
+    # Individual providers (solo doctors are often registered this way, not as organizations)
+    for item in _npi_query({"last_name": q + "*", "enumeration_type": "NPI-1", "limit": 5}):
+        basic = item.get("basic", {}) or {}
+        loc = _npi_location(item)
+        npi = str(item.get("number", ""))
+        if npi in seen:
+            continue
+        seen.add(npi)
+        first = (basic.get("first_name") or "").title()
+        last = (basic.get("last_name") or "").title()
+        cred = basic.get("credential") or ""
+        display = f"{first} {last}" + (f", {cred}" if cred else "")
+        out.append(
+            {
+                "npi": npi,
+                "name": display.strip(),
+                "kind": "Provider",
+                "address": (loc.get("address_1") or "").title(),
+                "city": (loc.get("city") or "").title(),
+                "state": loc.get("state") or "",
+            }
+        )
+
+    return out[:10]
 
 
 # ---------- templates ----------
