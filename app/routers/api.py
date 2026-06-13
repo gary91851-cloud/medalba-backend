@@ -154,6 +154,8 @@ def update_me(body: ProviderUpdate, provider=Depends(get_current_provider)):
 # ---------- patients ----------
 class PatientIn(BaseModel):
     first_name: str
+    last_initial: str = ""
+    chart_ref: str = ""
     age: int
     conditions: list[str] = []
 
@@ -194,6 +196,8 @@ def create_guide(
                 "practice_id": provider["practice_id"],
                 "provider_id": provider["id"],
                 "first_name": body.patient.first_name.strip(),
+                "last_initial": (body.patient.last_initial.strip()[:1].upper() or None) if body.patient.last_initial.strip() else None,
+                "chart_ref": body.patient.chart_ref.strip() or None,
                 "age": body.patient.age,
                 "conditions": body.patient.conditions or [body.condition],
             }
@@ -231,7 +235,7 @@ def get_guide(guide_id: str, provider=Depends(get_current_provider)):
     db = get_db()
     res = (
         db.table("guides")
-        .select("*, patients(first_name, age, conditions)")
+        .select("*, patients(first_name, last_initial, chart_ref, age, conditions)")
         .eq("id", guide_id)
         .eq("practice_id", provider["practice_id"])
         .single()

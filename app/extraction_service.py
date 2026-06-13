@@ -13,7 +13,7 @@ EXTRACTION_SYSTEM = """You extract structured data from lab result PDFs (Quest, 
 
 Rules:
 - Extract ONLY what is actually in the document. Never infer or invent values.
-- Patient name: return FIRST NAME ONLY (minimum-necessary PHI). If only a full name appears, return just the first name.
+- Patient name: return the FIRST NAME and the LAST INITIAL only (a single capital letter, no period) — minimum-necessary PHI. Never return the full last name.
 - Age: if only DOB is present, compute age from the collection date on the report (or today if absent).
 - Values: every lab analyte you find, with value, unit, and the lab's own reference range if printed.
 - prior_values: if the report shows previous results for the same analyte, capture them.
@@ -24,6 +24,7 @@ Rules:
 Respond with ONLY valid JSON, no markdown fences:
 {
   "first_name": "",
+  "last_initial": "",
   "age": null,
   "values": {"LDL": "190 mg/dL"},
   "prior_values": {},
