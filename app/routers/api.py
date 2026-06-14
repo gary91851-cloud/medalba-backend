@@ -278,7 +278,7 @@ def approve(guide_id: str, provider=Depends(get_current_provider)):
     db = get_db()
     guide = (
         db.table("guides")
-        .select("id, status")
+        .select("id, status, conflicts, acknowledged_flags")
         .eq("id", guide_id)
         .eq("practice_id", provider["practice_id"])
         .single()
@@ -289,6 +289,18 @@ def approve(guide_id: str, provider=Depends(get_current_provider)):
         raise HTTPException(404, "Guide not found")
     if guide["status"] != "pending_review":
         raise HTTPException(400, f"Guide is {guide['status']}, not pending review")
+    # Gate: every blocking flag (must_address / should_consider) must be acknowledged
+    acked = set(guide.get("acknowledged_flags") or [])
+    blocking = [
+        i for i, c in enumerate(guide.get("conflicts") or [])
+        if (c.get("severity") or "should_consider") in ("must_address", "should_consider")
+    ]
+    open_flags = [i for i in blocking if i not in acked]
+    if open_flags:
+        raise HTTPException(
+            400,
+            f"{len(open_flags)} flag(s) still need to be resolved or acknowledged before approving.",
+        )
     token = approve_guide(guide_id)
     s = get_settings()
     return {"ok": True, "patient_link": f"{s.guide_base_url}/{token}"}
@@ -385,6 +397,36 @@ def send_guide_to_patient(guide_id: str, body: SendGuideBody, provider=Depends(g
         raise HTTPException(502, reason or "Email couldn't be sent — copy the link and send it yourself.")
     db.table("guides").update({"patient_email": email, "sent_at": "now()"}).eq("id", guide_id).execute()
     return {"ok": True, "sent_to": email}
+
+
+class AckBody(BaseModel):
+    flag_index: int
+    acknowledged: bool = True
+
+
+@router.post("/guides/{guide_id}/acknowledge")
+def acknowledge_flag(guide_id: str, body: AckBody, provider=Depends(get_current_provider)):
+    db = get_db()
+    guide = (
+        db.table("guides")
+        .select("acknowledged_flags, status")
+        .eq("id", guide_id)
+        .eq("practice_id", provider["practice_id"])
+        .single()
+        .execute()
+        .data
+    )
+    if not guide:
+        raise HTTPException(404, "Guide not found")
+    if guide["status"] == "approved":
+        raise HTTPException(400, "Guide already approved")
+    acked = set(guide.get("acknowledged_flags") or [])
+    if body.acknowledged:
+        acked.add(body.flag_index)
+    else:
+        acked.discard(body.flag_index)
+    db.table("guides").update({"acknowledged_flags": sorted(acked)}).eq("id", guide_id).execute()
+    return {"ok": True, "acknowledged_flags": sorted(acked)}
 
 
 # ---------- public patient access (token, no login) ----------
