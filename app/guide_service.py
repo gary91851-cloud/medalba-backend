@@ -85,6 +85,43 @@ def generate_guide(guide_id: str) -> None:
         raise
 
 
+def regenerate_section(guide_id: str, section: str, instruction: str) -> None:
+    """Doctor rejected the AI's approach for one section. Regenerate ONLY that
+    section under the doctor's explicit instruction (translate mode, max autonomy down)."""
+    import json
+    db = get_db()
+    s = get_settings()
+    guide = db.table("guides").select("*").eq("id", guide_id).single().execute().data
+    patient = db.table("patients").select("*").eq("id", guide["patient_id"]).single().execute().data
+
+    current = (guide.get("edited_json") or {}).get(section)
+    client = anthropic.Anthropic(api_key=s.anthropic_api_key)
+    sys = system_prompt_for(guide["condition"]) + (
+        "\n\nYou are REVISING ONE SECTION of an existing Guide under the doctor's explicit instruction. "
+        "Output ONLY a valid JSON object for that single section, matching the same shape it currently has. "
+        "No markdown, no preamble, no other sections."
+    )
+    user = (
+        f"PATIENT: {patient['first_name']}, age {patient['age']}, conditions: "
+        f"{', '.join(patient.get('conditions') or [])}.\n\n"
+        f"SECTION TO REVISE: {section}\n\n"
+        f"CURRENT VERSION:\n{json.dumps(current)}\n\n"
+        f"DOCTOR'S INSTRUCTION (follow exactly): {instruction}\n\n"
+        f"Return the revised '{section}' JSON only."
+    )
+    msg = client.messages.create(model=s.claude_model, max_tokens=6000, system=sys,
+                                 messages=[{"role": "user", "content": user}])
+    text = msg.content[0].text.strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    revised = json.loads(text.strip())
+    edited = guide.get("edited_json") or {}
+    edited[section] = revised
+    db.table("guides").update({"edited_json": edited}).eq("id", guide_id).execute()
+
+
 def approve_guide(guide_id: str) -> str:
     """Doctor clicked approve: timestamp it, mint the secure token."""
     db = get_db()

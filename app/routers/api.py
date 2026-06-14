@@ -399,6 +399,32 @@ def send_guide_to_patient(guide_id: str, body: SendGuideBody, provider=Depends(g
     return {"ok": True, "sent_to": email}
 
 
+class RegenSection(BaseModel):
+    section: str
+    instruction: str
+
+
+@router.post("/guides/{guide_id}/regenerate-section")
+def regenerate_section_route(guide_id: str, body: RegenSection, provider=Depends(get_current_provider)):
+    if not body.instruction.strip():
+        raise HTTPException(400, "Tell us the approach you'd like instead.")
+    db = get_db()
+    guide = (
+        db.table("guides").select("id, status").eq("id", guide_id)
+        .eq("practice_id", provider["practice_id"]).single().execute().data
+    )
+    if not guide:
+        raise HTTPException(404, "Guide not found")
+    if guide["status"] == "approved":
+        raise HTTPException(400, "Guide already approved")
+    from ..guide_service import regenerate_section
+    try:
+        regenerate_section(guide_id, body.section, body.instruction.strip())
+    except Exception as e:
+        raise HTTPException(502, f"Couldn't revise that section: {e}")
+    return {"ok": True}
+
+
 class AckBody(BaseModel):
     flag_index: int
     acknowledged: bool = True
