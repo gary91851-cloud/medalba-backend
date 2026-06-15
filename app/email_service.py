@@ -67,12 +67,10 @@ def send_welcome(to: str, provider_name: str, practice_name: str) -> tuple[bool,
   plain-English Guide — and you made every clinical decision in it.</p>
   <p style="margin:0 0 20px;">Your first 5 Guides are free. About 15 seconds each.</p>
 </td></tr>
-<tr><td align="center" style="padding:6px 0;">
-  <a href="https://medalba-frontend.vercel.app" target="_blank"
-    style="background-color:#2e6e6a;border-radius:9px;color:#ffffff;display:inline-block;
-    font-family:Arial,sans-serif;font-size:17px;font-weight:bold;line-height:52px;
-    text-align:center;text-decoration:none;width:280px;-webkit-text-size-adjust:none;">
-    Create your first Guide</a>
+<tr><td align="center" style="padding-bottom:6px;">
+  <a href="https://medalba-frontend.vercel.app" style="background:#2e6e6a;color:#ffffff;text-decoration:none;
+  font-family:Arial,sans-serif;font-weight:700;font-size:15px;padding:13px 30px;border-radius:9px;display:inline-block;">
+  Create your first Guide</a>
 </td></tr>"""
     footer = "You're receiving this because you created a MedAlba practice account."
     return _send(to, f"Welcome to MedAlba, {provider_name}", body, footer)
@@ -87,23 +85,18 @@ def send_guide(to: str, patient_first_name: str, practice_name: str, condition: 
   what to do next, one day at a time.</p>
   <p style="margin:0 0 20px;">Your doctor reviewed and approved every word of it.</p>
 </td></tr>
-<tr><td align="center" style="padding:8px 0 4px;">
-  <p style="margin:0 0 8px;font-family:Arial,sans-serif;font-size:15px;color:#49616a;">Tap below to open your Guide:</p>
-  <a href="{link}" target="_blank"
-    style="font-family:Arial,sans-serif;font-size:18px;font-weight:bold;color:#2e6e6a;
-    text-decoration:underline;word-break:break-all;line-height:1.6;">{link}</a>
-</td></tr>
-<tr><td align="center" style="padding:14px 0 4px;">
-  <a href="{link}" target="_blank"
-    style="background-color:#2e6e6a;border-radius:9px;color:#ffffff;display:inline-block;
-    font-family:Arial,sans-serif;font-size:16px;font-weight:bold;line-height:48px;
-    text-align:center;text-decoration:none;width:260px;-webkit-text-size-adjust:none;">
-    Open your Guide</a>
+<tr><td align="center" style="padding-bottom:10px;">
+  <a href="{link}" style="background:#2e6e6a;color:#ffffff;text-decoration:none;
+  font-family:Arial,sans-serif;font-weight:700;font-size:15px;padding:13px 30px;border-radius:9px;display:inline-block;">
+  Open your Guide</a>
 </td></tr>
 <tr><td style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#49616a;padding-bottom:14px;">
   No account or password needed — the link is private to you.
 </td></tr>
-"""
+<tr><td style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#49616a;line-height:1.6;">
+  If the button doesn't open, copy this link into your browser:<br>
+  <a href="{link}" style="color:#2e6e6a;word-break:break-all;">{link}</a>
+</td></tr>"""
     footer = (f"This Guide was sent by {practice_name}. It is educational support approved by your doctor "
               "and is not a substitute for medical advice. For clinical questions, contact your doctor's office.")
     return _send(to, f"{patient_first_name}, your personal Guide from {practice_name}", body, footer)
