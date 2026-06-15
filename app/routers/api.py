@@ -126,6 +126,7 @@ def list_templates(provider=Depends(get_current_provider)):
 # ---------- settings ----------
 class PracticeUpdate(BaseModel):
     name: str | None = None
+    signoffs: list[str] | None = None
 
 
 @router.patch("/practice")
@@ -134,6 +135,8 @@ def update_practice(body: PracticeUpdate, provider=Depends(get_current_provider)
     updates = {}
     if body.name and body.name.strip():
         updates["name"] = body.name.strip()
+    if body.signoffs is not None:
+        updates["signoffs"] = [s.strip() for s in body.signoffs if s and s.strip()][:3]
     if updates:
         db.table("practices").update(updates).eq("id", provider["practice_id"]).execute()
     return {"ok": True}
@@ -461,7 +464,7 @@ def public_guide(token: str):
     db = get_db()
     res = (
         db.table("guides")
-        .select("edited_json, condition, approved_at, checkoffs, patients(first_name)")
+        .select("id, edited_json, condition, approved_at, checkoffs, practice_id, patients(first_name)")
         .eq("secure_token", token)
         .eq("status", "approved")
         .execute()
@@ -469,12 +472,22 @@ def public_guide(token: str):
     if not res.data:
         raise HTTPException(404, "Guide not found")
     g = res.data[0]
+    practice = (
+        db.table("practices").select("name, signoffs").eq("id", g["practice_id"]).single().execute().data
+    )
+    signoffs = (practice or {}).get("signoffs") or []
+    signoff = ""
+    if signoffs:
+        # stable per guide, varies across guides
+        signoff = signoffs[sum(ord(c) for c in g["id"]) % len(signoffs)]
     return {
         "first_name": g["patients"]["first_name"],
         "condition": g["condition"],
         "approved_at": g["approved_at"],
         "guide": g["edited_json"],
         "checkoffs": g["checkoffs"],
+        "practice_name": (practice or {}).get("name") or "",
+        "signoff": signoff,
     }
 
 
