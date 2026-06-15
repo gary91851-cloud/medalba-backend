@@ -68,14 +68,9 @@ def send_welcome(to: str, provider_name: str, practice_name: str) -> tuple[bool,
   <p style="margin:0 0 20px;">Your first 5 Guides are free. About 15 seconds each.</p>
 </td></tr>
 <tr><td align="center" style="padding-bottom:6px;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
-    <td bgcolor="#2e6e6a" style="border-radius:9px;">
-      <a href="https://medalba-frontend.vercel.app" target="_blank"
-        style="display:inline-block;padding:14px 34px;font-family:Arial,sans-serif;font-size:16px;
-        font-weight:700;color:#ffffff;text-decoration:none;border-radius:9px;">
-        Create your first Guide</a>
-    </td>
-  </tr></table>
+  <a href="https://medalba-frontend.vercel.app" style="background:#2e6e6a;color:#ffffff;text-decoration:none;
+  font-family:Arial,sans-serif;font-weight:700;font-size:15px;padding:13px 30px;border-radius:9px;display:inline-block;">
+  Create your first Guide</a>
 </td></tr>"""
     footer = "You're receiving this because you created a MedAlba practice account."
     return _send(to, f"Welcome to MedAlba, {provider_name}", body, footer)
@@ -91,14 +86,9 @@ def send_guide(to: str, patient_first_name: str, practice_name: str, condition: 
   <p style="margin:0 0 20px;">Your doctor reviewed and approved every word of it.</p>
 </td></tr>
 <tr><td align="center" style="padding-bottom:10px;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
-    <td bgcolor="#2e6e6a" style="border-radius:9px;">
-      <a href="{link}" target="_blank"
-        style="display:inline-block;padding:14px 34px;font-family:Arial,sans-serif;font-size:16px;
-        font-weight:700;color:#ffffff;text-decoration:none;border-radius:9px;">
-        Open your Guide</a>
-    </td>
-  </tr></table>
+  <a href="{link}" style="background:#2e6e6a;color:#ffffff;text-decoration:none;
+  font-family:Arial,sans-serif;font-weight:700;font-size:15px;padding:13px 30px;border-radius:9px;display:inline-block;">
+  Open your Guide</a>
 </td></tr>
 <tr><td style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#49616a;padding-bottom:14px;">
   No account or password needed — the link is private to you.
