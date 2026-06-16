@@ -54,11 +54,23 @@ GUIDE_JSON_SHAPE = """{
     ],
     "trend_note": "if a prior value exists: 'Your LDL dropped from X to Y — on this Guide you're on track for Z in N weeks.' Empty string otherwise."
   },
+  "reassurance": [
+    {"question": "the exact human fear, said out loud: 'Is this going to kill me?' / 'Is this my fault?' / 'Can I still eat what I love?' / 'What happens if I stop taking the medication?'",
+     "answer": "honest, warm, direct — 2-3 sentences max. No false comfort, no hedging. If the answer is hard, say it gently but say it."}
+  ],
+  "next_steps": {
+    "recheck_description": "what the next lab draw or visit will check, in plain English",
+    "recheck_timeframe": "e.g. '8 weeks from now' or 'at your next visit in [timeframe]'",
+    "targets": [
+      {"measure": "e.g. HbA1c", "goal": "trending toward 7%", "what_it_means": "the treatment is working"}
+    ],
+    "if_not_improving": "honest, non-scary explanation of what happens next if numbers don't move: doctor adjusts, not failure"
+  },
   "conflicts": [
     {"issue": "where two conditions or constraints genuinely collide, or where a medication is held/changed",
      "question_for_doctor": "the specific question only the doctor can answer",
      "severity": "must_address | should_consider | fyi",
-     "section": "which Guide section this affects: results_decoded | body_impact | daily_guidance | medication_guide | holistic_options | progress_timeline"}
+     "section": "which Guide section this affects: results_decoded | body_impact | daily_guidance | medication_guide | holistic_options | progress_timeline | reassurance | next_steps"}
   ]
 }"""
 
@@ -68,6 +80,7 @@ WHO YOU ARE WRITING FOR: a frightened person sitting alone with numbers they do 
 
 ABSOLUTE RULES — these never move:
 1. You sit downstream of the doctor's judgment, never in place of it. You do not diagnose, do not prescribe, do not change medications, do not contradict the doctor.
+1b. CARRY THE DOCTOR'S VOICE. The patient should feel the doctor is still in the room. Use the doctor's name (provided below) naturally throughout: "Dr. [Name] reviewed your results and wants you to know..." in the opening, "Dr. [Name] prescribed this because..." in the medication section, "Dr. [Name] will recheck your labs..." in the timeline. The AI is invisible. The doctor is present. Never say "AI analysis" or "we generated" — always "your doctor" or the doctor's name.
 2. Every Guide is reviewed and approved by the patient's doctor before the patient sees it. Write knowing a physician will edit you.
 SEVERITY OF CONFLICTS — assign honestly:
 - "must_address": a held or changed medication still described as active; a recommendation that could harm given a stated constraint (e.g. high-potassium foods with severe kidney disease); anything where shipping the Guide unchanged could mislead the patient about their care.
@@ -81,7 +94,15 @@ Always set "section" to the Guide section the doctor would edit to resolve it.
 6. Never use the word "guarantee" about outcomes or patient behavior.
 7. Be honest in progress framing: curable/improvable conditions get improvement milestones; chronic conditions get management and stability milestones. Both get genuine hope.
 8. grocery_list: 8-10 items maximum. Starter suggestions covering the week's meals - staples and anchors only, never an exhaustive shopping haul. One item per line (no comma-packed mega-lines).
-9. BE BRIEF. A worried patient skims; every extra sentence costs comprehension. Hard limits: results summary max 2 sentences; each value meaning max 2 sentences; body_impact summary max 3 sentences and each organ effect max 2 sentences; connection max 2 sentences; daily overview max 3 sentences; each medication field max 2 sentences; each holistic how/evidence max 2 sentences; framing max 2 sentences; each milestone expect max 2 sentences and measurable max 1 sentence; trend_note max 3 sentences. Short sentences. No filler.
+9. REASSURANCE SECTION: Generate 3-5 "questions you might have" that address the human fears every patient has but is too embarrassed to ask their doctor. Say the fear out loud ("You might be wondering: is this my fault?") then answer it directly and warmly. Condition-specific:
+   - Cholesterol: "Is this going to kill me?" / "Is this my fault?" / "Can I still eat what I love?" / "Do I have to take statins forever?"
+   - Diabetes: "Will I need insulin?" / "Is this my fault?" / "Can I ever eat sugar again?" / "Will this shorten my life?"
+   - Kidney disease: "Am I going to need dialysis?" / "Can kidneys heal?" / "Why do I feel fine if my kidneys are damaged?"
+   - Generic: always include "Is this my fault?" and "What happens if I don't follow this plan?"
+   These are NOT medical questions. They are human questions. Answer as a warm, honest person — not a clinical system.
+10. NEXT STEPS: Generate a concrete "what happens next" with a specific recheck timeframe (based on the condition — lipids recheck in 6-12 weeks, A1c in 3 months, kidney function in 1-3 months). Name specific targets ("Dr. [Name] will be looking for your LDL trending toward [goal]"). Include what "working" looks like AND what happens if it's not working (doctor adjusts, not patient failure).
+11. MEDICATION IN THE TIMELINE: When medications are present, weave them into the daily guidance days. Day 1 should mention the medication start ("You took your first [med] this morning — here's what to expect today"). Days 2-3 should address early side effects. Day 7 should frame what "a week in" feels like. The medication section stays as a reference, but the daily guidance carries the medication journey so the patient lives it day by day, not section by section.
+12. BE BRIEF. A worried patient skims; every extra sentence costs comprehension. Hard limits: results summary max 2 sentences; each value meaning max 2 sentences; body_impact summary max 3 sentences and each organ effect max 2 sentences; connection max 2 sentences; daily overview max 3 sentences; each medication field max 2 sentences; each holistic how/evidence max 2 sentences; framing max 2 sentences; each milestone expect max 2 sentences and measurable max 1 sentence; trend_note max 3 sentences. Short sentences. No filler.
 
 OUTPUT: respond with ONLY a valid JSON object matching this exact shape — no markdown fences, no preamble:
 """ + GUIDE_JSON_SHAPE
@@ -134,6 +155,7 @@ def build_user_prompt(
         f"- First name: {patient['first_name']}",
         f"- Age: {patient['age']}",
         f"- Conditions: {', '.join(patient.get('conditions') or ['(primary only)'])}",
+        f"- Doctor's name: {patient.get('provider_name') or 'your doctor'}",
         "",
         "LAB VALUES / CLINICAL INPUT:",
     ]

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from ..auth import get_current_provider
 from ..db import get_db
@@ -489,6 +490,46 @@ def public_guide(token: str):
         "practice_name": (practice or {}).get("name") or "",
         "signoff": signoff,
     }
+
+
+@router.get("/public/guide/{token}/pdf")
+def download_guide_pdf(token: str):
+    db = get_db()
+    res = (
+        db.table("guides")
+        .select("id, edited_json, condition, approved_at, checkoffs, practice_id, patients(first_name)")
+        .eq("secure_token", token)
+        .eq("status", "approved")
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(404, "Guide not found")
+    g = res.data[0]
+    practice = (
+        db.table("practices").select("name, signoffs").eq("id", g["practice_id"]).single().execute().data
+    )
+    signoffs = (practice or {}).get("signoffs") or []
+    signoff = ""
+    if signoffs:
+        signoff = signoffs[sum(ord(c) for c in g["id"]) % len(signoffs)]
+
+    from ..pdf_service import generate_guide_pdf
+    from io import BytesIO
+    pdf_bytes = generate_guide_pdf({
+        "first_name": g["patients"]["first_name"],
+        "condition": g["condition"],
+        "approved_at": g["approved_at"],
+        "guide": g["edited_json"],
+        "checkoffs": g["checkoffs"],
+        "practice_name": (practice or {}).get("name") or "",
+        "signoff": signoff,
+    })
+    safe_name = g["patients"]["first_name"].replace(" ", "_")
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="MedAlba_Guide_{safe_name}.pdf"'},
+    )
 
 
 class Feedback(BaseModel):

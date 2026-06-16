@@ -53,6 +53,10 @@ def generate_guide(guide_id: str) -> None:
 
     template = _best_template(db, guide["practice_id"], guide["condition"], patient["age"])
 
+    # Fetch provider name so the Guide carries the doctor's voice
+    provider = db.table("providers").select("full_name").eq("id", guide["provider_id"]).single().execute().data
+    patient["provider_name"] = (provider or {}).get("full_name") or "your doctor"
+
     client = anthropic.Anthropic(api_key=s.anthropic_api_key)
     try:
         msg = client.messages.create(
@@ -153,6 +157,37 @@ def approve_guide(guide_id: str, provider_id: str) -> str:
         "patient_age": patient["age"],
         "condition": guide["condition"],
     }).execute()
+
+    # Auto-learn: silently upsert a practice template from this approved Guide.
+    # The doctor's edits become the starting point for future similar patients.
+    # Uses the newest approved Guide per condition as the template (no manual save needed).
+    try:
+        condition = guide["condition"].strip().lower()
+        existing = (
+            db.table("templates")
+            .select("id")
+            .eq("practice_id", guide["practice_id"])
+            .eq("provider_id", provider_id)
+            .eq("condition", condition)
+            .eq("name", f"_auto_{condition}")
+            .execute()
+            .data
+        )
+        template_data = {
+            "practice_id": guide["practice_id"],
+            "provider_id": provider_id,
+            "condition": condition,
+            "name": f"_auto_{condition}",
+            "guide_json": approved_json,
+            "age_min": max(0, patient["age"] - 15),
+            "age_max": min(120, patient["age"] + 15),
+        }
+        if existing:
+            db.table("templates").update(template_data).eq("id", existing[0]["id"]).execute()
+        else:
+            db.table("templates").insert(template_data).execute()
+    except Exception:
+        pass  # auto-learn is best-effort; never blocks approval
 
     # Now update the guide itself
     db.table("guides").update(
