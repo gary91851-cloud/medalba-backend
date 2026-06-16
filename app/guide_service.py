@@ -6,6 +6,7 @@ Captures the training triple on every run:
   truth  = edited_json                       (doctor's edits, the ground truth)
 """
 import json
+import json
 import secrets
 import anthropic
 from .config import get_settings
@@ -122,10 +123,38 @@ def regenerate_section(guide_id: str, section: str, instruction: str) -> None:
     db.table("guides").update({"edited_json": edited}).eq("id", guide_id).execute()
 
 
-def approve_guide(guide_id: str) -> str:
-    """Doctor clicked approve: timestamp it, mint the secure token."""
+def approve_guide(guide_id: str, provider_id: str) -> str:
+    """Doctor clicked approve: timestamp it, mint the secure token, write immutable audit row."""
+    import hashlib
     db = get_db()
     token = secrets.token_urlsafe(24)
+
+    # Fetch the full guide + patient for the snapshot
+    guide = db.table("guides").select("*").eq("id", guide_id).single().execute().data
+    patient = db.table("patients").select("*").eq("id", guide["patient_id"]).single().execute().data
+
+    # Write the immutable audit row BEFORE updating the guide status
+    approved_json = guide.get("edited_json") or guide.get("generated_json") or {}
+    db.table("guide_approvals").insert({
+        "guide_id": guide_id,
+        "provider_id": provider_id,
+        "practice_id": guide["practice_id"],
+        "approved_json_hash": hashlib.sha256(
+            json.dumps(approved_json, sort_keys=True).encode()
+        ).hexdigest(),
+        "approved_json": approved_json,
+        "generated_json": guide.get("generated_json") or {},
+        "input_data": guide.get("input_data") or {},
+        "clinical_rails": guide.get("clinical_rails") or {},
+        "conflicts": guide.get("conflicts") or [],
+        "acknowledged_flags": guide.get("acknowledged_flags") or [],
+        "model_used": guide.get("model_used"),
+        "patient_first_name": patient["first_name"],
+        "patient_age": patient["age"],
+        "condition": guide["condition"],
+    }).execute()
+
+    # Now update the guide itself
     db.table("guides").update(
         {
             "status": "approved",

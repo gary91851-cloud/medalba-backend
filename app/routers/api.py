@@ -304,7 +304,7 @@ def approve(guide_id: str, provider=Depends(get_current_provider)):
             400,
             f"{len(open_flags)} flag(s) still need to be resolved or acknowledged before approving.",
         )
-    token = approve_guide(guide_id)
+    token = approve_guide(guide_id, provider["id"])
     s = get_settings()
     return {"ok": True, "patient_link": f"{s.guide_base_url}/{token}"}
 
