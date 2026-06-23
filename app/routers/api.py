@@ -357,6 +357,25 @@ def read_loop(guide_id: str, provider=Depends(get_current_provider)):
     return result
 
 
+# ---------- results board: all loops for the practice ----------
+@router.get("/loops")
+def list_loops(provider=Depends(get_current_provider)):
+    db = get_db()
+    return (
+        db.table("loops")
+        .select(
+            "id, guide_id, status, severity, action_type, action_due_at, action_note, "
+            "action_completed_at, result_label, resulted_at, reviewed_at, sent_at, "
+            "acknowledged_at, closed_at, closed_method, created_at, "
+            "patients(first_name, last_initial, age), guides(condition)"
+        )
+        .eq("practice_id", provider["practice_id"])
+        .order("created_at", desc=True)
+        .execute()
+        .data
+    )
+
+
 class TemplateSave(BaseModel):
     name: str
     age_min: int | None = None
@@ -445,7 +464,7 @@ def send_guide_to_patient(guide_id: str, body: SendGuideBody, provider=Depends(g
     from ..email_service import send_guide
     ok, reason = send_guide(email, guide["patients"]["first_name"], practice["name"], guide["condition"], link)
     if not ok:
-        raise HTTPException(502, reason or "Email couldn't be sent â€” copy the link and send it yourself.")
+        raise HTTPException(502, reason or "Email couldn't be sent — copy the link and send it yourself.")
     db.table("guides").update({"patient_email": email, "sent_at": "now()"}).eq("id", guide_id).execute()
     # Advance the loop to 'sent' once the email has actually gone out.
     advance_loop(guide_id, "sent", actor="provider", actor_id=provider["id"],
