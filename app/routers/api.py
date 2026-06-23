@@ -5,6 +5,7 @@ from ..auth import get_current_provider
 from ..db import get_db
 from ..extraction_service import extract_from_pdf
 from ..guide_service import generate_guide, approve_guide
+from ..loop_service import open_loop, advance_loop, get_loop_for_guide
 from ..config import get_settings
 
 router = APIRouter(prefix="/api")
@@ -230,6 +231,14 @@ def create_guide(
         .execute()
         .data[0]
     )
+    # Open the closed-loop tracker for this result (status='resulted') before generation fires.
+    open_loop(
+        guide_id=guide["id"],
+        patient_id=patient["id"],
+        practice_id=provider["practice_id"],
+        provider_id=provider["id"],
+        result_label=body.condition.strip(),
+    )
     background.add_task(generate_guide, guide["id"])
     return {"guide_id": guide["id"], "patient_id": patient["id"]}
 
@@ -277,8 +286,16 @@ def edit_section(guide_id: str, body: SectionEdit, provider=Depends(get_current_
     return {"ok": True}
 
 
+class ApproveBody(BaseModel):
+    # Follow-up capture (step 3). Defaults make this safe for the current
+    # frontend, which sends no body yet — the loop just advances with no action set.
+    action_type: str | None = None      # none | repeat_test | referral | appointment
+    action_due_date: str | None = None  # ISO date string; required when action_type isn't 'none'
+    action_notes: str | None = None
+
+
 @router.post("/guides/{guide_id}/approve")
-def approve(guide_id: str, provider=Depends(get_current_provider)):
+def approve(guide_id: str, body: ApproveBody = ApproveBody(), provider=Depends(get_current_provider)):
     db = get_db()
     guide = (
         db.table("guides")
@@ -306,8 +323,36 @@ def approve(guide_id: str, provider=Depends(get_current_provider)):
             f"{len(open_flags)} flag(s) still need to be resolved or acknowledged before approving.",
         )
     token = approve_guide(guide_id, provider["id"])
+    # Advance the loop to 'reviewed' and capture the follow-up action the doctor chose.
+    advance_loop(
+        guide_id, "reviewed", actor="provider", actor_id=provider["id"],
+        action_type=body.action_type, action_due_at=body.action_due_date,
+        action_note=body.action_notes,
+    )
     s = get_settings()
     return {"ok": True, "patient_link": f"{s.guide_base_url}/{token}"}
+
+
+# ---------- closed-loop read (for the loop detail / timeline view) ----------
+@router.get("/guides/{guide_id}/loop")
+def read_loop(guide_id: str, provider=Depends(get_current_provider)):
+    db = get_db()
+    # Ownership check: only return the loop if this provider's practice owns the guide.
+    guide = (
+        db.table("guides")
+        .select("id")
+        .eq("id", guide_id)
+        .eq("practice_id", provider["practice_id"])
+        .single()
+        .execute()
+        .data
+    )
+    if not guide:
+        raise HTTPException(404, "Guide not found")
+    result = get_loop_for_guide(guide_id)
+    if not result:
+        return {"loop": None, "events": []}
+    return result
 
 
 class TemplateSave(BaseModel):
@@ -398,8 +443,11 @@ def send_guide_to_patient(guide_id: str, body: SendGuideBody, provider=Depends(g
     from ..email_service import send_guide
     ok, reason = send_guide(email, guide["patients"]["first_name"], practice["name"], guide["condition"], link)
     if not ok:
-        raise HTTPException(502, reason or "Email couldn't be sent — copy the link and send it yourself.")
+        raise HTTPException(502, reason or "Email couldn't be sent â€” copy the link and send it yourself.")
     db.table("guides").update({"patient_email": email, "sent_at": "now()"}).eq("id", guide_id).execute()
+    # Advance the loop to 'sent' once the email has actually gone out.
+    advance_loop(guide_id, "sent", actor="provider", actor_id=provider["id"],
+                 metadata={"sent_to": email})
     return {"ok": True, "sent_to": email}
 
 
