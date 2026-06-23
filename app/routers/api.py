@@ -6,6 +6,7 @@ from ..db import get_db
 from ..extraction_service import extract_from_pdf
 from ..guide_service import generate_guide, approve_guide
 from ..loop_service import open_loop, advance_loop, get_loop_for_guide
+from ..severity import classify_severity
 from ..config import get_settings
 
 router = APIRouter(prefix="/api")
@@ -238,6 +239,7 @@ def create_guide(
         practice_id=provider["practice_id"],
         provider_id=provider["id"],
         result_label=body.condition.strip(),
+        severity=classify_severity(body.values),
     )
     background.add_task(generate_guide, guide["id"])
     return {"guide_id": guide["id"], "patient_id": patient["id"]}
