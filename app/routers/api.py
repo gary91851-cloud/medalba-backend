@@ -5,7 +5,7 @@ from ..auth import get_current_provider
 from ..db import get_db
 from ..extraction_service import extract_from_pdf
 from ..guide_service import generate_guide, approve_guide
-from ..loop_service import open_loop, advance_loop, get_loop_for_guide, acknowledge_loop_by_guide, close_loop
+from ..loop_service import open_loop, advance_loop, get_loop_for_guide, acknowledge_loop_by_guide, close_loop, mark_action_complete
 from ..severity import classify_severity
 from ..config import get_settings
 
@@ -384,6 +384,18 @@ def close_loop_route(loop_id: str, provider=Depends(get_current_provider)):
     if result == "forbidden":
         raise HTTPException(403, "That loop belongs to another practice")
     return {"ok": True, "already_closed": result == "already"}
+
+
+@router.post("/loops/{loop_id}/complete-action")
+def complete_action_route(loop_id: str, provider=Depends(get_current_provider)):
+    result = mark_action_complete(loop_id, provider)
+    if result == "missing":
+        raise HTTPException(404, "Loop not found")
+    if result == "forbidden":
+        raise HTTPException(403, "That loop belongs to another practice")
+    if result == "no_action":
+        raise HTTPException(400, "This loop has no follow-up action to complete")
+    return {"ok": True, "already_complete": result == "already"}
 
 
 class TemplateSave(BaseModel):

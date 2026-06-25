@@ -119,6 +119,33 @@ def close_loop(loop_id: str, provider: dict) -> str:
     return "ok"
 
 
+def mark_action_complete(loop_id: str, provider: dict) -> str:
+    """Verify the follow-up action actually happened (e.g. repeat test came back,
+    referral note received). Records action_completed_at and logs the event.
+    Does NOT close the loop — closing is a separate, deliberate step.
+    Returns: 'ok' | 'already' | 'forbidden' | 'missing' | 'no_action'."""
+    db = get_db()
+    rows = db.table("loops").select("id, status, practice_id, action_type, action_completed_at").eq("id", loop_id).execute().data
+    if not rows:
+        return "missing"
+    loop = rows[0]
+    if loop["practice_id"] != provider["practice_id"]:
+        return "forbidden"
+    if not loop.get("action_type") or loop["action_type"] == "none":
+        return "no_action"
+    if loop.get("action_completed_at"):
+        return "already"
+    db.table("loops").update({"action_completed_at": "now()"}).eq("id", loop_id).execute()
+    db.table("loop_events").insert({
+        "loop_id": loop_id,
+        "event_type": "action_completed",
+        "actor": "provider",
+        "actor_id": provider["id"],
+        "metadata": {"action_type": loop["action_type"]},
+    }).execute()
+    return "ok"
+
+
 def get_loop_for_guide(guide_id: str) -> dict | None:
     """Return the loop + its chronological events for a guide, for the timeline view."""
     db = get_db()
