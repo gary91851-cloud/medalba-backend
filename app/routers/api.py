@@ -5,7 +5,7 @@ from ..auth import get_current_provider
 from ..db import get_db
 from ..extraction_service import extract_from_pdf
 from ..guide_service import generate_guide, approve_guide
-from ..loop_service import open_loop, advance_loop, get_loop_for_guide
+from ..loop_service import open_loop, advance_loop, get_loop_for_guide, acknowledge_loop_by_guide, close_loop
 from ..severity import classify_severity
 from ..config import get_settings
 
@@ -376,6 +376,16 @@ def list_loops(provider=Depends(get_current_provider)):
     )
 
 
+@router.post("/loops/{loop_id}/close")
+def close_loop_route(loop_id: str, provider=Depends(get_current_provider)):
+    result = close_loop(loop_id, provider)
+    if result == "missing":
+        raise HTTPException(404, "Loop not found")
+    if result == "forbidden":
+        raise HTTPException(403, "That loop belongs to another practice")
+    return {"ok": True, "already_closed": result == "already"}
+
+
 class TemplateSave(BaseModel):
     name: str
     age_min: int | None = None
@@ -542,6 +552,9 @@ def public_guide(token: str):
     if not res.data:
         raise HTTPException(404, "Guide not found")
     g = res.data[0]
+    # The patient opened their Guide via the secure link. Advance the loop to
+    # 'acknowledged' (first open only — the forward-only guard handles re-opens).
+    acknowledge_loop_by_guide(g["id"], channel="secure_link")
     practice = (
         db.table("practices").select("name, signoffs").eq("id", g["practice_id"]).single().execute().data
     )
